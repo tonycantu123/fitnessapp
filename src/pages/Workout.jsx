@@ -426,7 +426,7 @@ Rules:
 - Add research-backed notes to each exercise explaining WHY it's included for this athlete's specific goals
 - Tailor intensity to fitness level`
         }],
-        maxTokens: 2800,
+        maxTokens: 4096,
       })
       const newPlan = parseJSON(text)
       const updated = { ...activeProfile, workoutPlan: newPlan }
