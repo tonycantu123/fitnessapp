@@ -92,8 +92,8 @@ export default function App() {
 
   return (
     <AppContext.Provider value={ctx}>
-      <div className="flex flex-col h-screen bg-bg overflow-hidden">
-        <div className="flex-1 overflow-hidden">
+      <div className="flex flex-col bg-bg overflow-hidden" style={{ height: '100dvh' }}>
+        <div className="flex-1 min-h-0 overflow-hidden">
           <div className="page-enter">
             {tab === 'today'    && <Today    onLogout={handleLogout} />}
             {tab === 'workout'  && <Workout  />}

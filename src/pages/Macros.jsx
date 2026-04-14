@@ -377,7 +377,8 @@ export default function Macros() {
       </div>
 
       {/* Bottom bar */}
-      <div className="fixed bottom-16 left-0 right-0 mx-4 p-3 bg-[#0d0d0d] border border-border rounded-2xl flex justify-around text-center backdrop-blur-sm">
+      <div className="fixed left-0 right-0 mx-4 p-3 bg-[#0d0d0d] border border-border rounded-2xl flex justify-around text-center backdrop-blur-sm"
+        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px) + 8px)' }}>
         <div>
           <p className="text-white font-black text-lg">{Math.max(targets.calories-totals.calories,0)}</p>
           <p className="text-white/40 text-xs font-bold">kcal left</p>

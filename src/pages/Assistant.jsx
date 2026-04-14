@@ -126,9 +126,9 @@ When discussing workouts, cite relevant sports science research (e.g., progressi
   const showStarters = messages.length === 0
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
       {/* Header */}
-      <div className="px-4 pt-6 pb-4 border-b border-border shrink-0">
+      <div className="px-4 pt-4 pb-4 border-b border-border shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center">
