@@ -9,10 +9,9 @@ import {
   getCelebratedMilestones,
   getSupplements, getSupplementLog, saveSupplementLog,
   getWeeklyReport, saveWeeklyReport, getWeekStr,
-  getMacroLog as _getMacroLog,
 } from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
-import { callClaude, parseJSON } from '../utils/api'
+import { getTodayQuote, getTodayVerse, generateAlgoReport, searchFood } from '../utils/quotes'
 import MilestoneCelebration from '../components/MilestoneCelebration'
 import WeeklyReport from '../components/WeeklyReport'
 
@@ -75,7 +74,7 @@ function SupplementSettings({ profileId, onClose }) {
     if (!name.trim()) return
     const updated = [...supps, { id: Date.now(), name: name.trim(), time }]
     setSupps(updated)
-    saveSupplements(profileId, updated)  // <-- save immediately
+    saveSupplements(profileId, updated)
     setName('')
   }
 
@@ -96,8 +95,6 @@ function SupplementSettings({ profileId, onClose }) {
             </svg>
           </button>
         </div>
-
-        {/* Add form */}
         <div className="space-y-3 mb-5">
           <input
             className="w-full bg-[#1a1a1a] border border-border rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-accent"
@@ -117,8 +114,6 @@ function SupplementSettings({ profileId, onClose }) {
             Add Supplement
           </button>
         </div>
-
-        {/* List */}
         <div className="space-y-2">
           {supps.length === 0 && <p className="text-white/30 text-sm text-center py-4">No supplements added yet</p>}
           {supps.map(s => (
@@ -141,16 +136,83 @@ function SupplementSettings({ profileId, onClose }) {
   )
 }
 
+// ─── Food Search Results Modal ────────────────────────────────────────────────
+function FoodSearchModal({ results, onSelect, onClose }) {
+  const [grams, setGrams] = useState({})
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-card rounded-t-3xl p-5 pb-10 max-h-[70vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-white font-black text-base">Select a Food</p>
+          <button onClick={onClose} className="text-white/40 active:text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        {results.length === 0 ? (
+          <p className="text-white/40 text-sm text-center py-6">No results found. Try the barcode scanner or a more specific name.</p>
+        ) : (
+          <div className="space-y-3">
+            {results.map((r, i) => {
+              const g = parseFloat(grams[i]) || r.defaultGrams
+              const ratio = g / 100
+              return (
+                <div key={i} className="p-3 bg-[#1a1a1a] border border-border rounded-2xl">
+                  <p className="text-white font-bold text-sm truncate mb-1">{r.name}</p>
+                  <p className="text-white/40 text-xs mb-2">Per 100g: {r.per100g.calories} kcal · P:{r.per100g.protein}g · C:{r.per100g.carbs}g · F:{r.per100g.fat}g</p>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      className="w-20 bg-[#111] border border-border rounded-lg px-2 py-1.5 text-white text-sm font-bold focus:outline-none focus:border-accent"
+                      type="number" placeholder="g"
+                      value={grams[i] ?? r.defaultGrams}
+                      onChange={e => setGrams(prev => ({ ...prev, [i]: e.target.value }))}
+                    />
+                    <span className="text-white/30 text-xs">g</span>
+                    <span className="text-white/50 text-xs ml-1">{Math.round(r.per100g.calories * ratio)} kcal · P:{(r.per100g.protein * ratio).toFixed(1)}g</span>
+                    <button
+                      onClick={() => onSelect({
+                        name: `${r.name} (${g}g)`,
+                        calories: Math.round(r.per100g.calories * ratio),
+                        protein:  Math.round(r.per100g.protein  * ratio * 10) / 10,
+                        carbs:    Math.round(r.per100g.carbs    * ratio * 10) / 10,
+                        fat:      Math.round(r.per100g.fat      * ratio * 10) / 10,
+                      })}
+                      className="ml-auto px-3 py-1.5 bg-accent rounded-xl font-black text-white text-xs active:scale-95">
+                      Add
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Today({ onLogout }) {
   const { activeProfile, setTab } = useApp()
   const [macroLog, setMacroLog] = useState(() => getMacroLog(activeProfile.id, todayStr()))
   const [foodInput, setFoodInput] = useState('')
-  const [logging, setLogging] = useState(false)
-  const [quote, setQuote] = useState(null)
-  const [verse, setVerse] = useState(null)
-  const [loadingQuote, setLoadingQuote] = useState(false)
-  const [loadingVerse, setLoadingVerse] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [searchResults, setSearchResults] = useState(null)
+  const [quote] = useState(() => {
+    const cached = getDailyQuote(activeProfile.id, todayStr())
+    if (cached) return cached
+    const q = getTodayQuote()
+    saveDailyQuote(activeProfile.id, todayStr(), q)
+    return q
+  })
+  const [verse] = useState(() => {
+    const cached = getDailyVerse(todayStr())
+    if (cached) return cached
+    const v = getTodayVerse()
+    saveDailyVerse(todayStr(), v)
+    return v
+  })
   const [milestone, setMilestone] = useState(null)
   const [weeklyReport, setWeeklyReport] = useState(null)
   const [showReport, setShowReport] = useState(false)
@@ -174,34 +236,6 @@ export default function Today({ onLogout }) {
   const todayPlan = plan?.[todayDay]
   const { currentStreak } = calcStreak(activeProfile.id)
 
-  // ─── Daily quote ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const cached = getDailyQuote(activeProfile.id, todayStr())
-    if (cached) { setQuote(cached); return }
-    setLoadingQuote(true)
-    callClaude({
-      system: 'You are FORGE, a direct motivational fitness AI. Give ONE short motivational quote or tip (under 20 words). No quote marks. Just the text.',
-      messages: [{ role: 'user', content: `Profile: ${activeProfile.name}, goal: ${activeProfile.goal}. Give today's motivation.` }],
-      maxTokens: 60,
-    }).then(t => { const q = t.trim(); setQuote(q); saveDailyQuote(activeProfile.id, todayStr(), q) })
-      .catch(() => setQuote('Consistency beats intensity. Show up today.'))
-      .finally(() => setLoadingQuote(false))
-  }, [activeProfile.id])
-
-  // ─── Bible verse ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    const cached = getDailyVerse(todayStr())
-    if (cached) { setVerse(cached); return }
-    setLoadingVerse(true)
-    callClaude({
-      system: 'You are a Bible scholar. Return ONLY valid JSON with keys: reference (e.g. "Philippians 4:13") and text (verse text only, no commentary). Pick a verse about strength, perseverance, discipline, or purpose.',
-      messages: [{ role: 'user', content: `Daily Bible verse for ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.` }],
-      maxTokens: 120,
-    }).then(t => { const v = parseJSON(t); setVerse(v); saveDailyVerse(todayStr(), v) })
-      .catch(() => { const f = { reference: 'Philippians 4:13', text: 'I can do all things through Christ who strengthens me.' }; setVerse(f); saveDailyVerse(todayStr(), f) })
-      .finally(() => setLoadingVerse(false))
-  }, [])
-
   // ─── Milestone check ──────────────────────────────────────────────────────
   useEffect(() => {
     if (currentStreak === 0) return
@@ -210,17 +244,17 @@ export default function Today({ onLogout }) {
     if (hit) setMilestone(hit)
   }, [currentStreak, activeProfile.id])
 
-  // ─── Weekly report (auto on Sundays) ─────────────────────────────────────
+  // ─── Weekly report (auto on Sundays — algorithmic, no API) ───────────────
   useEffect(() => {
     const isSunday = new Date().getDay() === 0
     if (!isSunday) return
     const weekStr = getWeekStr()
     const existing = getWeeklyReport(activeProfile.id, weekStr)
     if (existing) { setWeeklyReport(existing); setShowReport(true); return }
-    generateWeeklyReport(weekStr, false)
+    generateWeeklyReport(weekStr)
   }, [activeProfile.id])
 
-  async function generateWeeklyReport(weekStr, show = true) {
+  function generateWeeklyReport(weekStr) {
     try {
       const last7 = Array.from({ length: 7 }, (_, i) => {
         const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10)
@@ -233,66 +267,36 @@ export default function Today({ onLogout }) {
       const daysWithFood = macroTotals.filter(m => m.cal > 0)
       const avgCal = daysWithFood.length ? Math.round(daysWithFood.reduce((a, m) => a + m.cal, 0) / daysWithFood.length) : 0
       const avgProtein = daysWithFood.length ? Math.round(daysWithFood.reduce((a, m) => a + m.pro, 0) / daysWithFood.length) : 0
-      const calAdherence = avgCal && targets.calories ? Math.min(Math.round((avgCal / targets.calories) * 100), 100) : 0
-
-      const text = await callClaude({
-        system: 'You are FORGE, an elite fitness coach. Generate weekly performance reports. Return ONLY valid JSON.',
-        messages: [{
-          role: 'user',
-          content: `Generate a weekly report for ${activeProfile.name}.
-
-Goal: ${activeProfile.goal} | Sport: ${activeProfile.sport || 'none'}
-Calorie target: ${targets.calories} | Protein target: ${targets.protein}g
-
-This week's stats:
-- Workouts completed: ${workoutsCompleted}/7 (${workoutRate}%)
-- Avg daily calories: ${avgCal} (target: ${targets.calories})
-- Avg daily protein: ${avgProtein}g (target: ${targets.protein}g)
-- Calorie adherence: ${calAdherence}%
-
-Return JSON:
-{
-  "overallGrade": "B+",
-  "workoutGrade": "A",
-  "macroGrade": "B",
-  "summary": "2-3 sentence honest assessment",
-  "recommendation": "One specific actionable focus for next week"
-}`
-        }],
-        maxTokens: 400,
-      })
-      const parsed = parseJSON(text)
-      const report = {
-        ...parsed,
-        weekStr,
-        stats: { workoutsCompleted, workoutRate, avgCal, avgProtein },
-        generatedAt: new Date().toISOString(),
-      }
+      const stats = { workoutsCompleted, workoutRate, avgCal, avgProtein }
+      const report = generateAlgoReport(stats, targets, weekStr)
       saveWeeklyReport(activeProfile.id, weekStr, report)
       setWeeklyReport(report)
-      if (show) setShowReport(true)
+      setShowReport(true)
     } catch (err) {
       console.error('Weekly report error', err)
     }
   }
 
-  // ─── Food logging ─────────────────────────────────────────────────────────
+  // ─── Food search (Open Food Facts — free) ────────────────────────────────
   async function logFood() {
-    if (!foodInput.trim() || logging) return
-    setLogging(true)
+    if (!foodInput.trim() || searching) return
+    setSearching(true)
     try {
-      const text = await callClaude({
-        system: 'You are a nutrition AI. Return ONLY valid JSON: { name, calories, protein, carbs, fat } (numbers). No markdown.',
-        messages: [{ role: 'user', content: `Estimate macros for: ${foodInput}` }],
-        maxTokens: 150,
-      })
-      const item = parseJSON(text)
-      const updated = { items: [...macroLog.items, { ...item, id: Date.now() }] }
-      saveMacroLog(activeProfile.id, todayStr(), updated)
-      setMacroLog(updated)
-      setFoodInput('')
-    } catch { alert('Could not parse food. Try being more specific.') }
-    finally { setLogging(false) }
+      const results = await searchFood(foodInput)
+      setSearchResults(results)
+    } catch {
+      alert('Could not search foods. Check your connection.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  function addFoodItem(item) {
+    const updated = { items: [...macroLog.items, { ...item, id: Date.now() }] }
+    saveMacroLog(activeProfile.id, todayStr(), updated)
+    setMacroLog(updated)
+    setSearchResults(null)
+    setFoodInput('')
   }
 
   // ─── Supplements ──────────────────────────────────────────────────────────
@@ -314,7 +318,6 @@ Return JSON:
           <h1 className="text-3xl font-black text-white">{activeProfile.name}</h1>
         </div>
         <div className="flex items-center gap-2 mt-1">
-          {/* Streak badge */}
           {currentStreak > 0 && (
             <div className="flex items-center gap-1 px-3 py-1.5 bg-orange-500/15 border border-orange-500/30 rounded-full">
               <span className="text-base leading-none">🔥</span>
@@ -335,13 +338,7 @@ Return JSON:
 
         {/* Motivational quote */}
         <div className="p-4 bg-accent/10 border border-accent/20 rounded-2xl">
-          {loadingQuote ? (
-            <div className="flex gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-accent/40 dot-1"/>
-              <div className="w-2 h-2 rounded-full bg-accent/40 dot-2"/>
-              <div className="w-2 h-2 rounded-full bg-accent/40 dot-3"/>
-            </div>
-          ) : <p className="text-accent font-bold text-sm">{quote}</p>}
+          <p className="text-accent font-bold text-sm">{quote}</p>
         </div>
 
         {/* Bible verse */}
@@ -350,18 +347,12 @@ Return JSON:
             <span className="text-lg">✝️</span>
             <span className="text-white/40 text-xs font-bold uppercase tracking-wider">Verse of the Day</span>
           </div>
-          {loadingVerse ? (
-            <div className="flex gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-white/20 dot-1"/>
-              <div className="w-2 h-2 rounded-full bg-white/20 dot-2"/>
-              <div className="w-2 h-2 rounded-full bg-white/20 dot-3"/>
-            </div>
-          ) : verse ? (
+          {verse && (
             <>
               <p className="text-white text-sm italic leading-relaxed">"{verse.text}"</p>
               <p className="text-white/40 text-xs font-bold mt-2">— {verse.reference}</p>
             </>
-          ) : null}
+          )}
         </div>
 
         {/* Today's workout */}
@@ -398,9 +389,7 @@ Return JSON:
               {supplements.map(s => (
                 <button key={s.id} onClick={() => toggleSupplement(s.id)}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                    suppLog[s.id]
-                      ? 'border-accent/30 bg-accent/5 opacity-60'
-                      : 'border-border bg-[#1a1a1a]'
+                    suppLog[s.id] ? 'border-accent/30 bg-accent/5 opacity-60' : 'border-border bg-[#1a1a1a]'
                   }`}>
                   <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${
                     suppLog[s.id] ? 'bg-accent border-accent' : 'border-white/20'
@@ -421,7 +410,6 @@ Return JSON:
           </div>
         )}
 
-        {/* Add supplements prompt if none set */}
         {supplements.length === 0 && (
           <button onClick={() => setShowSuppSettings(true)}
             className="w-full p-3 border border-dashed border-[#2a2a2a] rounded-2xl text-white/25 text-sm text-center">
@@ -441,16 +429,17 @@ Return JSON:
           <div className="flex gap-2">
             <input
               className="flex-1 bg-[#1a1a1a] border border-border rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-accent"
-              placeholder='e.g. "2 eggs and toast"'
+              placeholder='e.g. "chicken breast" or "banana"'
               value={foodInput}
               onChange={e => setFoodInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && logFood()}
             />
-            <button onClick={logFood} disabled={logging||!foodInput.trim()}
+            <button onClick={logFood} disabled={searching || !foodInput.trim()}
               className="px-4 py-3 bg-accent rounded-xl font-black text-white text-sm active:scale-95 disabled:opacity-40 transition-all">
-              {logging ? '…' : 'Log'}
+              {searching ? '…' : 'Search'}
             </button>
           </div>
+          <p className="text-white/25 text-xs mt-2">Search real foods from the food database</p>
           {macroLog.items.length > 0 && (
             <div className="mt-3 space-y-1">
               {macroLog.items.slice(-3).map(item => (
@@ -487,11 +476,9 @@ Return JSON:
           onClose={() => setMilestone(null)}
         />
       )}
-
       {showReport && weeklyReport && (
         <WeeklyReport report={weeklyReport} onClose={() => setShowReport(false)} />
       )}
-
       {showSuppSettings && (
         <SupplementSettings
           profileId={activeProfile.id}
@@ -499,6 +486,13 @@ Return JSON:
             setSupplements(getSupplements(activeProfile.id))
             setShowSuppSettings(false)
           }}
+        />
+      )}
+      {searchResults !== null && (
+        <FoodSearchModal
+          results={searchResults}
+          onSelect={addFoodItem}
+          onClose={() => setSearchResults(null)}
         />
       )}
     </div>

@@ -9,7 +9,7 @@ import {
   getWeeklyReport, saveWeeklyReport, getWeekStr, calcStreak,
 } from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
-import { callClaude, parseJSON } from '../utils/api'
+import { generateAlgoReport } from '../utils/quotes'
 import WeeklyReport from '../components/WeeklyReport'
 
 const TABS = ['This Week', 'This Month', 'All Time']
@@ -47,7 +47,7 @@ export default function Progress() {
   const targets = calcTDEE(activeProfile)
   const { currentStreak, longestStreak: lStreak } = calcStreak(activeProfile.id)
 
-  async function generateReport() {
+  function generateReport() {
     setGeneratingReport(true)
     const weekStr = getWeekStr()
     try {
@@ -62,21 +62,16 @@ export default function Progress() {
       const daysWithFood = macroTotals.filter(m => m.cal > 0)
       const avgCal = daysWithFood.length ? Math.round(daysWithFood.reduce((a,m) => a+m.cal,0)/daysWithFood.length) : 0
       const avgProtein = daysWithFood.length ? Math.round(daysWithFood.reduce((a,m) => a+m.pro,0)/daysWithFood.length) : 0
-      const text = await callClaude({
-        system: 'You are FORGE. Generate weekly fitness reports. Return ONLY valid JSON.',
-        messages: [{
-          role: 'user',
-          content: `Weekly report for ${activeProfile.name}. Goal: ${activeProfile.goal}. Targets: ${targets.calories} kcal, ${targets.protein}g protein. Stats: ${workoutsCompleted}/7 workouts, avg ${avgCal} kcal, avg ${avgProtein}g protein. Return JSON: { "overallGrade":"B+","workoutGrade":"A","macroGrade":"B","summary":"2-3 sentences","recommendation":"one action" }`
-        }],
-        maxTokens: 300,
-      })
-      const parsed = parseJSON(text)
-      const report = { ...parsed, weekStr, stats: { workoutsCompleted, workoutRate, avgCal, avgProtein }, generatedAt: new Date().toISOString() }
+      const stats = { workoutsCompleted, workoutRate, avgCal, avgProtein }
+      const report = generateAlgoReport(stats, targets, weekStr)
       saveWeeklyReport(activeProfile.id, weekStr, report)
       setWeeklyReport(report)
       setShowReport(true)
-    } catch { alert('Could not generate report. Try again.') }
-    finally { setGeneratingReport(false) }
+    } catch (err) {
+      console.error('Report error', err)
+    } finally {
+      setGeneratingReport(false)
+    }
   }
 
   const dates = useMemo(() => {

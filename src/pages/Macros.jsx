@@ -7,7 +7,7 @@ import {
   getFavorites, saveFavorites,
 } from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
-import { callClaude, parseJSON } from '../utils/api'
+import { searchFood } from '../utils/quotes'
 import BarcodeScanner from '../components/BarcodeScanner'
 
 // ─── Macro Ring ───────────────────────────────────────────────────────────────
@@ -125,6 +125,8 @@ export default function Macros() {
   const [weightUnit, setWeightUnit] = useState('g')
   const [logging, setLogging] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
+  const [searchResults, setSearchResults] = useState(null)
+  const [searching, setSearching] = useState(false)
 
   const targets = calcTDEE(activeProfile)
 
@@ -146,25 +148,31 @@ export default function Macros() {
   }
 
   async function logFood() {
-    if (!foodInput.trim() || logging) return
-    setLogging(true)
+    if (!foodInput.trim() || searching) return
+    setSearching(true)
     try {
-      let prompt = `Estimate macros for: ${foodInput}`
-      if (weightInput) {
-        const unit = weightUnit === 'oz' ? `${weightInput} oz` : `${weightInput}g`
-        prompt = `Estimate macros for: ${unit} of ${foodInput}`
-      }
-      const text = await callClaude({
-        system: 'You are a nutrition AI. Return ONLY valid JSON: { name, calories, protein, carbs, fat } (all numbers). No markdown.',
-        messages: [{ role: 'user', content: prompt }],
-        maxTokens: 150,
-      })
-      const item = parseJSON(text)
-      addItem(item)
-      setFoodInput('')
-      setWeightInput('')
-    } catch { alert('Could not estimate macros. Try being more specific.') }
-    finally { setLogging(false) }
+      const results = await searchFood(foodInput)
+      setSearchResults(results)
+    } catch {
+      alert('Could not search foods. Check your connection.')
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  function selectSearchResult(r) {
+    const grams = parseFloat(weightInput) || r.defaultGrams
+    const ratio = grams / 100
+    addItem({
+      name: `${r.name} (${grams}g)`,
+      calories: Math.round(r.per100g.calories * ratio),
+      protein:  Math.round(r.per100g.protein  * ratio * 10) / 10,
+      carbs:    Math.round(r.per100g.carbs    * ratio * 10) / 10,
+      fat:      Math.round(r.per100g.fat      * ratio * 10) / 10,
+    })
+    setSearchResults(null)
+    setFoodInput('')
+    setWeightInput('')
   }
 
   function deleteItem(id) {
@@ -270,11 +278,11 @@ export default function Macros() {
             </button>
           </div>
 
-          <button onClick={logFood} disabled={logging||!foodInput.trim()}
+          <button onClick={logFood} disabled={searching||!foodInput.trim()}
             className="w-full py-3 bg-accent rounded-xl font-black text-white text-sm active:scale-95 disabled:opacity-40 transition-all">
-            {logging ? 'Estimating…' : 'Add Food'}
+            {searching ? 'Searching…' : 'Search Food'}
           </button>
-          <p className="text-white/25 text-xs mt-2 text-center">Describe food in plain English — AI estimates macros</p>
+          <p className="text-white/25 text-xs mt-2 text-center">Search real foods from the food database — free &amp; instant</p>
         </div>
 
         {/* Food log */}
@@ -343,6 +351,45 @@ export default function Macros() {
           onResult={handleBarcodeResult}
           onClose={() => setShowScanner(false)}
         />
+      )}
+
+      {/* Food Search Results Modal */}
+      {searchResults !== null && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-card rounded-t-3xl p-5 pb-10 max-h-[75vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-white font-black text-base">Select a Food</p>
+              <button onClick={() => setSearchResults(null)} className="text-white/40 active:text-white">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            {searchResults.length === 0 ? (
+              <p className="text-white/40 text-sm text-center py-6">No results found. Try the barcode scanner or a different name.</p>
+            ) : (
+              <div className="space-y-3">
+                {searchResults.map((r, i) => (
+                  <div key={i} className="p-3 bg-[#1a1a1a] border border-border rounded-2xl">
+                    <p className="text-white font-bold text-sm truncate mb-1">{r.name}</p>
+                    <p className="text-white/40 text-xs mb-2">Per 100g: {r.per100g.calories} kcal · P:{r.per100g.protein}g · C:{r.per100g.carbs}g · F:{r.per100g.fat}g</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-white/40 text-xs">Serving: {weightInput || r.defaultGrams}g</span>
+                      <span className="text-white/50 text-xs ml-1">
+                        → {Math.round(r.per100g.calories * ((parseFloat(weightInput) || r.defaultGrams)/100))} kcal
+                      </span>
+                      <button
+                        onClick={() => selectSearchResult(r)}
+                        className="ml-auto px-4 py-1.5 bg-accent rounded-xl font-black text-white text-xs active:scale-95">
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
