@@ -12,6 +12,7 @@ import {
 } from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
 import { getTodayQuote, getTodayVerse, generateAlgoReport, searchFood } from '../utils/quotes'
+import { notificationPermission, requestNotificationPermission, scheduleDailyNotifications } from '../utils/notifications'
 import MilestoneCelebration from '../components/MilestoneCelebration'
 import WeeklyReport from '../components/WeeklyReport'
 
@@ -219,6 +220,7 @@ export default function Today({ onLogout }) {
   const [showSuppSettings, setShowSuppSettings] = useState(false)
   const [supplements, setSupplements] = useState(() => getSupplements(activeProfile.id))
   const [suppLog, setSuppLog] = useState(() => getSupplementLog(activeProfile.id, todayStr()))
+  const [notifPermission, setNotifPermission] = useState(() => notificationPermission())
 
   const targets = calcTDEE(activeProfile)
   const totals = macroLog.items.reduce(
@@ -235,6 +237,19 @@ export default function Today({ onLogout }) {
   const plan = activeProfile.workoutPlan
   const todayPlan = plan?.[todayDay]
   const { currentStreak } = calcStreak(activeProfile.id)
+
+  // ─── Schedule notifications whenever macro data changes ───────────────────
+  useEffect(() => {
+    if (notifPermission !== 'granted') return
+    scheduleDailyNotifications({
+      profile: activeProfile,
+      macroLog,
+      workoutLog,
+      targets,
+      supplements,
+      suppLog,
+    })
+  }, [macroLog, notifPermission])
 
   // ─── Milestone check ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -299,6 +314,15 @@ export default function Today({ onLogout }) {
     setFoodInput('')
   }
 
+  // ─── Enable notifications ─────────────────────────────────────────────────
+  async function enableNotifications() {
+    const granted = await requestNotificationPermission()
+    setNotifPermission(granted ? 'granted' : 'denied')
+    if (granted) {
+      scheduleDailyNotifications({ profile: activeProfile, macroLog, workoutLog, targets, supplements, suppLog })
+    }
+  }
+
   // ─── Supplements ──────────────────────────────────────────────────────────
   function toggleSupplement(id) {
     const updated = { ...suppLog, [id]: !suppLog[id] }
@@ -335,6 +359,21 @@ export default function Today({ onLogout }) {
       </div>
 
       <div className="px-4 space-y-4">
+
+        {/* Notification permission banner */}
+        {notifPermission === 'default' && (
+          <button
+            onClick={enableNotifications}
+            className="w-full flex items-center gap-3 p-3 bg-accent/5 border border-accent/20 rounded-2xl active:scale-[0.98] transition-all"
+          >
+            <span className="text-xl">🔔</span>
+            <div className="flex-1 text-left">
+              <p className="text-accent font-bold text-sm">Enable Reminders</p>
+              <p className="text-white/40 text-xs">Get protein, workout & supplement alerts</p>
+            </div>
+            <span className="text-accent/60 text-xs font-bold">Tap →</span>
+          </button>
+        )}
 
         {/* Motivational quote */}
         <div className="p-4 bg-accent/10 border border-accent/20 rounded-2xl">
