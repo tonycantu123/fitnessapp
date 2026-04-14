@@ -96,8 +96,8 @@ export default function BarcodeScanner({ onResult, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/90 backdrop-blur-sm">
-      <div className="w-full max-w-lg bg-card rounded-t-3xl overflow-hidden" style={{ maxHeight: '90vh' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm px-4">
+      <div className="w-full max-w-sm bg-card rounded-3xl overflow-hidden" style={{ maxHeight: '80vh' }}>
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
@@ -109,7 +109,7 @@ export default function BarcodeScanner({ onResult, onClose }) {
           </button>
         </div>
 
-        <div className="overflow-y-auto" style={{ maxHeight: 'calc(90vh - 64px)' }}>
+        <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 64px)' }}>
 
           {/* Camera stream */}
           {mode === 'scanning' && (
