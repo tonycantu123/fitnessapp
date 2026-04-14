@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useApp } from '../App'
-import { getMacroLog, getWorkoutLog, todayStr } from '../utils/storage'
+import { getMacroLog, getWorkoutLog, todayStr, getChatCount, incrementChatCount, CHAT_LIMIT } from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
 import { callClaude } from '../utils/api'
 
@@ -46,8 +46,10 @@ export default function Assistant() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [chatCount, setChatCount] = useState(() => getChatCount(activeProfile.id))
   const bottomRef = useRef(null)
   const inputRef = useRef(null)
+  const remaining = CHAT_LIMIT - chatCount
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -97,6 +99,7 @@ When discussing workouts, cite relevant sports science research (e.g., progressi
   async function send(text) {
     const userText = (text || input).trim()
     if (!userText || loading) return
+    if (chatCount >= CHAT_LIMIT) return
     setInput('')
 
     const userMsg = { role: 'user', content: userText }
@@ -111,6 +114,8 @@ When discussing workouts, cite relevant sports science research (e.g., progressi
         maxTokens: 400,
       })
       setMessages(msgs => [...msgs, { role: 'assistant', content: reply }])
+      incrementChatCount(activeProfile.id)
+      setChatCount(c => c + 1)
     } catch {
       setMessages(msgs => [...msgs, { role: 'assistant', content: "I'm having trouble connecting right now. Check your server connection." }])
     } finally {
@@ -124,15 +129,30 @@ When discussing workouts, cite relevant sports science research (e.g., progressi
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="px-4 pt-6 pb-4 border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center">
-            <span className="text-accent font-black text-sm">F</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-accent/20 border border-accent/40 flex items-center justify-center">
+              <span className="text-accent font-black text-sm">F</span>
+            </div>
+            <div>
+              <p className="text-white font-black">FORGE</p>
+              <p className="text-white/40 text-xs">Your AI coach · Always on</p>
+            </div>
           </div>
-          <div>
-            <p className="text-white font-black">FORGE</p>
-            <p className="text-white/40 text-xs">Your AI coach · Always on</p>
+          {/* Message counter */}
+          <div className={`px-3 py-1 rounded-full border text-xs font-bold ${
+            remaining <= 3 ? 'border-orange-500/40 bg-orange-500/10 text-orange-400'
+            : 'border-border text-white/30'
+          }`}>
+            {remaining}/{CHAT_LIMIT} left
           </div>
         </div>
+        {remaining <= 3 && remaining > 0 && (
+          <p className="text-orange-400/70 text-xs mt-2">⚠️ {remaining} message{remaining === 1 ? '' : 's'} left today — resets at midnight</p>
+        )}
+        {remaining === 0 && (
+          <p className="text-orange-400 text-xs font-bold mt-2">Daily limit reached. Come back tomorrow!</p>
+        )}
       </div>
 
       {/* Messages area */}
@@ -169,7 +189,8 @@ When discussing workouts, cite relevant sports science research (e.g., progressi
           <textarea
             ref={inputRef}
             className="flex-1 bg-[#1a1a1a] border border-border rounded-2xl px-4 py-3 text-white text-sm font-medium focus:outline-none focus:border-accent resize-none"
-            placeholder="Ask FORGE anything…"
+            placeholder={remaining === 0 ? "Daily limit reached — come back tomorrow" : "Ask FORGE anything…"}
+            disabled={remaining === 0}
             rows={1}
             value={input}
             onChange={e => {

@@ -5,6 +5,7 @@ import {
   getMacroLog, saveMacroLog, todayStr,
   getWaterLog, saveWaterLog,
   getFavorites, saveFavorites,
+  saveProfile,
 } from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
 import { searchFood } from '../utils/quotes'
@@ -117,18 +118,36 @@ function WaterTracker({ profileId, weight }) {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Macros() {
-  const { activeProfile } = useApp()
+  const { activeProfile, refreshProfile } = useApp()
   const [macroLog, setMacroLog] = useState(() => getMacroLog(activeProfile.id, todayStr()))
   const [favorites, setFavorites] = useState(() => getFavorites(activeProfile.id))
   const [foodInput, setFoodInput] = useState('')
   const [weightInput, setWeightInput] = useState('')
   const [weightUnit, setWeightUnit] = useState('g')
-  const [logging, setLogging] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const [searchResults, setSearchResults] = useState(null)
   const [searching, setSearching] = useState(false)
+  const [editingCals, setEditingCals] = useState(false)
+  const [calInput, setCalInput] = useState('')
 
-  const targets = calcTDEE(activeProfile)
+  const baseTDEE = calcTDEE(activeProfile)
+  const targets = { ...baseTDEE, calories: activeProfile.calorieGoal || baseTDEE.calories }
+
+  function saveCalorieGoal() {
+    const val = parseInt(calInput)
+    if (!val || val < 500 || val > 10000) return
+    const updated = { ...activeProfile, calorieGoal: val }
+    saveProfile(updated)
+    refreshProfile()
+    setEditingCals(false)
+  }
+
+  function resetCalorieGoal() {
+    const updated = { ...activeProfile, calorieGoal: null }
+    saveProfile(updated)
+    refreshProfile()
+    setEditingCals(false)
+  }
 
   const totals = macroLog.items.reduce(
     (acc, item) => ({
@@ -216,6 +235,36 @@ export default function Macros() {
         {/* Macro ring */}
         <div className="p-5 bg-card border border-border rounded-2xl">
           <MacroRingFull targets={targets} totals={totals} />
+          {/* Editable calorie goal */}
+          <div className="mt-4 pt-3 border-t border-border">
+            {editingCals ? (
+              <div className="flex gap-2 items-center">
+                <input
+                  className="flex-1 bg-[#1a1a1a] border border-accent/40 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none"
+                  type="number" placeholder={`Current: ${targets.calories}`}
+                  value={calInput}
+                  onChange={e => setCalInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && saveCalorieGoal()}
+                  autoFocus
+                />
+                <span className="text-white/40 text-xs">kcal</span>
+                <button onClick={saveCalorieGoal} className="px-3 py-2 bg-accent rounded-xl text-white font-black text-xs active:scale-95">Save</button>
+                {activeProfile.calorieGoal && (
+                  <button onClick={resetCalorieGoal} className="px-3 py-2 border border-border rounded-xl text-white/40 text-xs active:scale-95">Reset</button>
+                )}
+                <button onClick={() => setEditingCals(false)} className="text-white/30 text-xs active:text-white">✕</button>
+              </div>
+            ) : (
+              <button onClick={() => { setCalInput(String(targets.calories)); setEditingCals(true) }}
+                className="flex items-center gap-1.5 text-white/30 text-xs active:text-white/60 transition-colors">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                {activeProfile.calorieGoal ? `Custom goal: ${targets.calories} kcal` : `Edit calorie goal (${targets.calories} kcal TDEE)`}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Water tracker */}

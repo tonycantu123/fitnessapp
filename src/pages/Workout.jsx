@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useApp } from '../App'
-import { saveProfile, getWorkoutLog, saveWorkoutLog, todayStr, dateStr } from '../utils/storage'
+import { saveProfile, getWorkoutLog, saveWorkoutLog, todayStr, dateStr, getPlanGenCount, incrementPlanGenCount, PLAN_GEN_LIMIT } from '../utils/storage'
 import { callClaude, parseJSON } from '../utils/api'
 
 const DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
@@ -365,6 +365,7 @@ export default function Workout() {
   const [selectedDay, setSelectedDay] = useState(() => (new Date().getDay() + 6) % 7)
   const [generating, setGenerating] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [planGenCount, setPlanGenCount] = useState(() => getPlanGenCount(activeProfile.id))
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [showAIModify, setShowAIModify] = useState(false)
   const [showInjury, setShowInjury] = useState(false)
@@ -390,6 +391,7 @@ export default function Workout() {
 
   // ─── Generate full plan ──────────────────────────────────────────────────
   async function generatePlan() {
+    if (planGenCount >= PLAN_GEN_LIMIT) return
     setGenerating(true)
     try {
       const p = activeProfile
@@ -417,6 +419,8 @@ Rules:
       const updated = { ...activeProfile, workoutPlan: newPlan }
       saveProfile(updated)
       refreshProfile()
+      incrementPlanGenCount(activeProfile.id)
+      setPlanGenCount(c => c + 1)
     } catch (err) {
       alert(`Failed to generate plan: ${err.message}`)
     } finally {
@@ -542,13 +546,34 @@ Rules:
             <p className="text-4xl mb-3">⚡</p>
             <p className="text-white font-black text-xl mb-2">No Plan Yet</p>
             <p className="text-white/40 text-sm mb-4">Generate a personalized AI workout plan built around your goals, sport, and physique target.</p>
-            <button
-              onClick={generatePlan}
-              disabled={generating}
-              className="w-full py-4 bg-accent rounded-2xl font-black text-white text-lg active:scale-[0.98] disabled:opacity-60"
-            >
-              {generating ? 'Generating Plan…' : 'Generate My Plan'}
-            </button>
+            {planGenCount >= PLAN_GEN_LIMIT ? (
+              <div className="space-y-3">
+                <div className="p-3 bg-orange-500/10 border border-orange-500/30 rounded-xl">
+                  <p className="text-orange-400 font-bold text-sm">Weekly plan limit reached ({PLAN_GEN_LIMIT}/{PLAN_GEN_LIMIT})</p>
+                  <p className="text-white/40 text-xs mt-0.5">Resets next week. Use the buttons below to build your plan manually.</p>
+                </div>
+                <button onClick={() => setShowAddExercise(true)}
+                  className="w-full py-3 bg-accent rounded-2xl font-black text-white text-base active:scale-[0.98]">
+                  + Add Exercises Manually
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-center gap-1 mb-3">
+                  {Array.from({ length: PLAN_GEN_LIMIT }).map((_, i) => (
+                    <div key={i} className={`w-2 h-2 rounded-full ${i < planGenCount ? 'bg-orange-400' : 'bg-accent'}`} />
+                  ))}
+                </div>
+                <p className="text-white/30 text-xs mb-3">{PLAN_GEN_LIMIT - planGenCount} of {PLAN_GEN_LIMIT} generations left this week</p>
+                <button
+                  onClick={generatePlan}
+                  disabled={generating}
+                  className="w-full py-4 bg-accent rounded-2xl font-black text-white text-lg active:scale-[0.98] disabled:opacity-60"
+                >
+                  {generating ? 'Generating Plan…' : 'Generate My Plan'}
+                </button>
+              </>
+            )}
           </div>
 
         ) : dayPlan && dayPlan.exercises.length === 0 ? (
@@ -631,12 +656,16 @@ Rules:
 
         {/* Regenerate */}
         {plan && (
-          <button
-            onClick={() => setShowConfirm(true)}
-            className="w-full py-3 border border-border rounded-2xl text-white/40 text-sm font-semibold active:border-white/20 transition-all"
-          >
-            Regenerate Full Plan
-          </button>
+          <div className="space-y-1">
+            <button
+              onClick={() => planGenCount < PLAN_GEN_LIMIT ? setShowConfirm(true) : null}
+              disabled={planGenCount >= PLAN_GEN_LIMIT}
+              className="w-full py-3 border border-border rounded-2xl text-white/40 text-sm font-semibold active:border-white/20 transition-all disabled:opacity-30"
+            >
+              Regenerate Full Plan
+            </button>
+            <p className="text-white/20 text-xs text-center">{PLAN_GEN_LIMIT - planGenCount}/{PLAN_GEN_LIMIT} AI generations left this week</p>
+          </div>
         )}
       </div>
 

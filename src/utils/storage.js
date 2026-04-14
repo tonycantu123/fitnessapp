@@ -222,3 +222,26 @@ export function getAllMacroDates(profileId) {
 export function generateId() {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 }
+
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+
+export const PLAN_GEN_LIMIT = 2   // per week
+export const CHAT_LIMIT     = 15  // per day
+
+export function getPlanGenCount(profileId) {
+  const key = `forged_plangen_${profileId}_${getWeekStr()}`
+  return parseInt(localStorage.getItem(key) || '0')
+}
+export function incrementPlanGenCount(profileId) {
+  const key = `forged_plangen_${profileId}_${getWeekStr()}`
+  localStorage.setItem(key, String(getPlanGenCount(profileId) + 1))
+}
+
+export function getChatCount(profileId) {
+  const key = `forged_chat_${profileId}_${todayStr()}`
+  return parseInt(localStorage.getItem(key) || '0')
+}
+export function incrementChatCount(profileId) {
+  const key = `forged_chat_${profileId}_${todayStr()}`
+  localStorage.setItem(key, String(getChatCount(profileId) + 1))
+}

@@ -1,4 +1,35 @@
-<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'>
-  <rect width='180' height='180' rx='36' fill='#0a0a0a'/>
-  <text x='50%' y='65%' font-family='Arial' font-size='99.00000000000001' font-weight='900' text-anchor='middle' fill='#e8f54e'>F</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softglow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="20" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <radialGradient id="bggrad" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#0d1520"/>
+      <stop offset="100%" stop-color="#050a0f"/>
+    </radialGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="url(#bggrad)"/>
+  <!-- Glow halo behind bolt -->
+  <circle cx="256" cy="210" r="100" fill="#4da6ff" opacity="0.06" filter="url(#softglow)"/>
+  <!-- Corner brackets -->
+  <path d="M44 90 L44 44 L90 44" stroke="#4da6ff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M422 44 L468 44 L468 90" stroke="#4da6ff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M44 422 L44 468 L90 468" stroke="#4da6ff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M468 422 L468 468 L422 468" stroke="#4da6ff" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+  <!-- Lightning bolt -->
+  <path d="M288 82 L200 248 L258 248 L210 388 L338 198 L276 198 L318 82 Z"
+        fill="#4da6ff" filter="url(#glow)" opacity="0.95"/>
+  <!-- FORGE text -->
+  <text x="256" y="436" text-anchor="middle" fill="#ffffff"
+        font-family="Arial Black, Impact, sans-serif" font-weight="900"
+        font-size="58" letter-spacing="14">FORGE</text>
+  <!-- Tagline -->
+  <text x="256" y="466" text-anchor="middle" fill="#4da6ff"
+        font-family="Arial, sans-serif" font-size="13" letter-spacing="4" opacity="0.8">YOUR BODY. YOUR PLAN.</text>
 </svg>
