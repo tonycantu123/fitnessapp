@@ -9,8 +9,8 @@ const todayDay = DAY_NAMES[new Date().getDay()]
 
 const STARTERS = [
   "What should I eat to hit my protein today?",
-  "How do I do today's first exercise?",
-  "I only have 20 minutes, give me a shorter workout",
+  "Modify today's workout for me — I want more explosiveness",
+  "What does the research say about training for my goal?",
   "What's a good pre-workout meal for my goal?",
 ]
 
@@ -89,7 +89,9 @@ TODAY'S NUTRITION:
 - Protein eaten: ${eaten.pro}g / ${targets.protein}g target
 - Foods logged: ${macroLog.items.map(i => i.name).join(', ') || 'none yet'}
 
-Always give actionable, specific advice. Reference their actual data when relevant.`
+Always give actionable, specific advice. Reference their actual data when relevant.
+
+When discussing workouts, cite relevant sports science research (e.g., progressive overload, SAID principle, RPE, periodization, VO2 max, hypertrophy mechanisms). Keep citations brief but credible. If the user asks you to modify a workout, return the full updated exercise list clearly formatted so they can follow it immediately.`
   }
 
   async function send(text) {

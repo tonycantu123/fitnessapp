@@ -10,7 +10,7 @@ function MacroRingFull({ targets, totals }) {
 
   const data = [
     { name: 'bg',       value: 100,                     fill: '#1e1e1e' },
-    { name: 'calories', value: pct(totals.calories),    fill: '#e8f54e' },
+    { name: 'calories', value: pct(totals.calories),    fill: '#4da6ff' },
   ]
 
   return (

@@ -6,7 +6,7 @@ function initials(name) {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
 }
 
-const AVATAR_COLORS = ['#e8f54e', '#f54e4e', '#4ef5a0', '#4eb5f5', '#f5a04e', '#c44ef5']
+const AVATAR_COLORS = ['#4da6ff', '#f54e4e', '#4ef5a0', '#4eb5f5', '#f5a04e', '#c44ef5']
 
 export default function ProfileSelect({ onSelect, onAddProfile }) {
   const [profiles] = useState(() => getProfiles())

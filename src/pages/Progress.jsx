@@ -149,7 +149,7 @@ export default function Progress() {
                 />
                 <YAxis hide />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="completed" fill="#e8f54e" radius={[4, 4, 0, 0]} name="Completed" />
+                <Bar dataKey="completed" fill="#4da6ff" radius={[4, 4, 0, 0]} name="Completed" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -181,8 +181,8 @@ export default function Progress() {
                     <XAxis dataKey="date" tick={{ fill: '#555', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <YAxis hide />
                     <Tooltip content={<CustomTooltip />} />
-                    <Line type="monotone" dataKey="calories"  stroke="#e8f54e" strokeWidth={2} dot={false} name="Calories" />
-                    <Line type="monotone" dataKey="targetCal" stroke="#e8f54e" strokeWidth={1} strokeDasharray="4 4" dot={false} name="Cal Target" />
+                    <Line type="monotone" dataKey="calories"  stroke="#4da6ff" strokeWidth={2} dot={false} name="Calories" />
+                    <Line type="monotone" dataKey="targetCal" stroke="#4da6ff" strokeWidth={1} strokeDasharray="4 4" dot={false} name="Cal Target" />
                     <Line type="monotone" dataKey="protein"   stroke="#4e9ef5" strokeWidth={2} dot={false} name="Protein (g)" />
                     <Line type="monotone" dataKey="targetPro" stroke="#4e9ef5" strokeWidth={1} strokeDasharray="4 4" dot={false} name="Pro Target" />
                   </LineChart>

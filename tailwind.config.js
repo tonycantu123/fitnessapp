@@ -10,8 +10,8 @@ export default {
         bg: '#0a0a0a',
         card: '#141414',
         border: '#222222',
-        accent: '#e8f54e',
-        'accent-dim': '#c5d83a',
+        accent: '#4da6ff',
+        'accent-dim': '#2e8de0',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

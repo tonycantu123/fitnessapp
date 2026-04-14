@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react'
 import { RadialBarChart, RadialBar, ResponsiveContainer } from 'recharts'
 import { useApp } from '../App'
-import { todayStr, getMacroLog, saveMacroLog, getDailyQuote, saveDailyQuote, getWorkoutLog } from '../utils/storage'
+import {
+  todayStr, getMacroLog, saveMacroLog,
+  getDailyQuote, saveDailyQuote,
+  getDailyVerse, saveDailyVerse,
+  getWorkoutLog
+} from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
 import { callClaude, parseJSON } from '../utils/api'
 
 const DAY_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-const today = new Date()
-const todayDay = DAY_NAMES[today.getDay()]
+const todayDay = DAY_NAMES[new Date().getDay()]
 
 function MacroRing({ targets, totals }) {
   const calPct = Math.min((totals.calories / targets.calories) * 100, 100)
   const data = [
-    { name: 'bg',       value: 100, fill: '#1e1e1e' },
-    { name: 'calories', value: calPct, fill: '#e8f54e' },
+    { name: 'bg',       value: 100,    fill: '#1e1e1e' },
+    { name: 'calories', value: calPct, fill: '#4da6ff' },
   ]
   const remaining = Math.max(targets.calories - totals.calories, 0)
 
@@ -25,8 +29,7 @@ function MacroRing({ targets, totals }) {
             cx="50%" cy="50%"
             innerRadius="70%" outerRadius="100%"
             startAngle={90} endAngle={-270}
-            data={data}
-            barSize={10}
+            data={data} barSize={10}
           >
             <RadialBar dataKey="value" cornerRadius={10} background={false} />
           </RadialBarChart>
@@ -67,6 +70,8 @@ export default function Today({ onLogout }) {
   const [logging, setLogging] = useState(false)
   const [quote, setQuote] = useState(null)
   const [loadingQuote, setLoadingQuote] = useState(false)
+  const [verse, setVerse] = useState(null)
+  const [loadingVerse, setLoadingVerse] = useState(false)
   const targets = calcTDEE(activeProfile)
 
   const totals = macroLog.items.reduce(
@@ -79,18 +84,17 @@ export default function Today({ onLogout }) {
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   )
 
-  // Today's workout summary
   const workoutLog = getWorkoutLog(activeProfile.id, todayStr())
   const plan = activeProfile.workoutPlan
   const todayPlan = plan?.[todayDay]
 
-  // Daily quote
+  // Daily motivational quote
   useEffect(() => {
     const cached = getDailyQuote(activeProfile.id, todayStr())
     if (cached) { setQuote(cached); return }
     setLoadingQuote(true)
     callClaude({
-      system: 'You are FORGE, a direct motivational fitness AI. Give ONE short motivational quote or tip for the day (under 20 words). No quotes marks. Just the text.',
+      system: 'You are FORGE, a direct motivational fitness AI. Give ONE short motivational quote or tip for the day (under 20 words). No quote marks. Just the text.',
       messages: [{ role: 'user', content: `Profile: ${activeProfile.name}, goal: ${activeProfile.goal}. Give me today's motivation.` }],
       maxTokens: 60,
     }).then(text => {
@@ -101,6 +105,26 @@ export default function Today({ onLogout }) {
       setQuote('Consistency beats intensity. Show up today.')
     }).finally(() => setLoadingQuote(false))
   }, [activeProfile.id])
+
+  // Daily Bible verse — shared across all profiles, cached by date
+  useEffect(() => {
+    const cached = getDailyVerse(todayStr())
+    if (cached) { setVerse(cached); return }
+    setLoadingVerse(true)
+    callClaude({
+      system: 'You are a Bible scholar. Return ONLY valid JSON with keys: reference (string, e.g. "Philippians 4:13") and text (the verse text, no extra commentary). Pick a verse about strength, perseverance, discipline, or purpose.',
+      messages: [{ role: 'user', content: `Give me an uplifting Bible verse for today, ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}.` }],
+      maxTokens: 120,
+    }).then(text => {
+      const v = parseJSON(text)
+      setVerse(v)
+      saveDailyVerse(todayStr(), v)
+    }).catch(() => {
+      const fallback = { reference: 'Philippians 4:13', text: 'I can do all things through Christ who strengthens me.' }
+      setVerse(fallback)
+      saveDailyVerse(todayStr(), fallback)
+    }).finally(() => setLoadingVerse(false))
+  }, [])
 
   async function logFood() {
     if (!foodInput.trim() || logging) return
@@ -134,10 +158,7 @@ export default function Today({ onLogout }) {
           <p className="text-white/50 text-sm font-medium">{greeting},</p>
           <h1 className="text-3xl font-black text-white">{activeProfile.name}</h1>
         </div>
-        <button
-          onClick={onLogout}
-          className="mt-1 p-2 text-white/30 active:text-white"
-        >
+        <button onClick={onLogout} className="mt-1 p-2 text-white/30 active:text-white">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
             <polyline points="16 17 21 12 16 7"/>
@@ -147,7 +168,8 @@ export default function Today({ onLogout }) {
       </div>
 
       <div className="px-4 space-y-4">
-        {/* Daily quote */}
+
+        {/* Daily motivational quote */}
         <div className="p-4 bg-accent/10 border border-accent/20 rounded-2xl">
           {loadingQuote ? (
             <div className="flex gap-1.5">
@@ -158,6 +180,26 @@ export default function Today({ onLogout }) {
           ) : (
             <p className="text-accent font-bold text-sm">{quote}</p>
           )}
+        </div>
+
+        {/* Daily Bible verse */}
+        <div className="p-4 bg-[#141420] border border-[#2a2a4a] rounded-2xl">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-lg">✝️</span>
+            <span className="text-white/40 text-xs font-bold uppercase tracking-wider">Verse of the Day</span>
+          </div>
+          {loadingVerse ? (
+            <div className="flex gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-white/20 dot-1" />
+              <div className="w-2 h-2 rounded-full bg-white/20 dot-2" />
+              <div className="w-2 h-2 rounded-full bg-white/20 dot-3" />
+            </div>
+          ) : verse ? (
+            <>
+              <p className="text-white text-sm italic leading-relaxed">"{verse.text}"</p>
+              <p className="text-white/40 text-xs font-bold mt-2">— {verse.reference}</p>
+            </>
+          ) : null}
         </div>
 
         {/* Today's workout card */}
@@ -175,9 +217,7 @@ export default function Today({ onLogout }) {
             <>
               <p className="text-white font-black text-lg">{todayPlan.focus}</p>
               <p className="text-white/40 text-sm mt-0.5">
-                {workoutLog?.completed
-                  ? '✅ Completed'
-                  : `${todayPlan.exercises?.length || 0} exercises`}
+                {workoutLog?.completed ? '✅ Completed' : `${todayPlan.exercises?.length || 0} exercises`}
               </p>
             </>
           ) : (
@@ -207,7 +247,7 @@ export default function Today({ onLogout }) {
             <button
               onClick={logFood}
               disabled={logging || !foodInput.trim()}
-              className="px-4 py-3 bg-accent rounded-xl font-black text-black text-sm active:scale-95 disabled:opacity-40 transition-all"
+              className="px-4 py-3 bg-accent rounded-xl font-black text-white text-sm active:scale-95 disabled:opacity-40 transition-all"
             >
               {logging ? '…' : 'Log'}
             </button>
@@ -228,6 +268,7 @@ export default function Today({ onLogout }) {
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

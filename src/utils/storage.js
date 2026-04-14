@@ -68,6 +68,19 @@ export function saveDailyQuote(profileId, dateStr, quote) {
   localStorage.setItem(`forged_quote_${profileId}_${dateStr}`, JSON.stringify(quote))
 }
 
+// ─── Daily Bible verse cache ──────────────────────────────────────────────────
+
+export function getDailyVerse(dateStr) {
+  try {
+    const raw = localStorage.getItem(`forged_verse_${dateStr}`)
+    return raw ? JSON.parse(raw) : null
+  } catch { return null }
+}
+
+export function saveDailyVerse(dateStr, verse) {
+  localStorage.setItem(`forged_verse_${dateStr}`, JSON.stringify(verse))
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 export function todayStr() {
