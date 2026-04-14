@@ -397,34 +397,19 @@ export default function Workout() {
         system: 'You are an expert fitness coach and sports science researcher. Create evidence-based workout plans. Return only valid JSON.',
         messages: [{
           role: 'user',
-          content: `Generate a complete 7-day workout plan. Return ONLY valid JSON.
+          content: `Generate a 7-day workout plan as JSON only. No explanation outside the JSON.
 
-Profile:
-- Goal: ${p.goal} | Physique: ${p.physiqueGoal || 'not specified'}
-- Sport: ${p.sport || 'none'} | Fitness level: ${p.fitnessLevel}
-- Has gym: ${p.hasGym} | Activity: ${p.activityLevel}
-- Age: ${p.age}, Gender: ${p.gender}, Weight: ${p.weight} lbs
-- Goal description: ${p.goalDescription || 'not specified'}
-- Current routine: ${p.currentRoutine || 'none'}
+Athlete: ${p.goal}, ${p.fitnessLevel} level, ${p.hasGym ? 'has gym' : 'no gym'}, sport: ${p.sport || 'none'}.
 
-JSON format:
-{
-  "Monday": {
-    "focus": "Chest & Triceps",
-    "exercises": [
-      { "name": "Bench Press", "sets": "4", "reps": "8-10", "rest": "90s", "notes": "Research-backed: primary horizontal push for hypertrophy. Keep back flat, control the eccentric." }
-    ]
-  },
-  ...all 7 days...
-}
+Return this exact structure:
+{"Monday":{"focus":"Chest & Triceps","exercises":[{"name":"Bench Press","sets":"4","reps":"8-10","rest":"90s","notes":"Form tip here"}]},"Tuesday":{...},...all 7 days}
 
 Rules:
-- Include sport-specific drills if sport is listed (agility/explosiveness for basketball, rotational power for golf, etc.)
-- If no gym: bodyweight/home exercises only
-- 4–6 exercises per training day, 1–2 rest days
-- Rest days: { "focus": "Rest", "exercises": [] }
-- Add research-backed notes to each exercise explaining WHY it's included for this athlete's specific goals
-- Tailor intensity to fitness level`
+- 3-4 exercises per training day, 1-2 rest days
+- Rest day format: {"focus":"Rest","exercises":[]}
+- Notes: one short form tip only (under 10 words)
+- No gym = bodyweight only
+- Sport-specific drills if sport listed`
         }],
         maxTokens: 4096,
       })
