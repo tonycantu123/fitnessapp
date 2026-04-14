@@ -1,11 +1,16 @@
 import { useState, useMemo } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  LineChart, Line, CartesianGrid, Legend
+  LineChart, Line, CartesianGrid,
 } from 'recharts'
 import { useApp } from '../App'
-import { getWorkoutLog, getMacroLog, last7Days, last30Days, getAllLogDates, todayStr } from '../utils/storage'
+import {
+  getWorkoutLog, getMacroLog, last7Days, last30Days, getAllLogDates, todayStr,
+  getWeeklyReport, saveWeeklyReport, getWeekStr, calcStreak,
+} from '../utils/storage'
 import { calcTDEE } from '../utils/tdee'
+import { callClaude, parseJSON } from '../utils/api'
+import WeeklyReport from '../components/WeeklyReport'
 
 const TABS = ['This Week', 'This Month', 'All Time']
 
@@ -36,7 +41,43 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function Progress() {
   const { activeProfile } = useApp()
   const [tab, setTab] = useState(0)
+  const [showReport, setShowReport] = useState(false)
+  const [weeklyReport, setWeeklyReport] = useState(() => getWeeklyReport(activeProfile.id, getWeekStr()))
+  const [generatingReport, setGeneratingReport] = useState(false)
   const targets = calcTDEE(activeProfile)
+  const { currentStreak, longestStreak: lStreak } = calcStreak(activeProfile.id)
+
+  async function generateReport() {
+    setGeneratingReport(true)
+    const weekStr = getWeekStr()
+    try {
+      const last7 = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10)
+      })
+      const workouts = last7.map(d => getWorkoutLog(activeProfile.id, d))
+      const macros   = last7.map(d => getMacroLog(activeProfile.id, d))
+      const workoutsCompleted = workouts.filter(w => w?.completed).length
+      const workoutRate = Math.round((workoutsCompleted / 7) * 100)
+      const macroTotals = macros.map(m => m.items.reduce((a, i) => ({ cal: a.cal+(i.calories||0), pro: a.pro+(i.protein||0) }), { cal:0, pro:0 }))
+      const daysWithFood = macroTotals.filter(m => m.cal > 0)
+      const avgCal = daysWithFood.length ? Math.round(daysWithFood.reduce((a,m) => a+m.cal,0)/daysWithFood.length) : 0
+      const avgProtein = daysWithFood.length ? Math.round(daysWithFood.reduce((a,m) => a+m.pro,0)/daysWithFood.length) : 0
+      const text = await callClaude({
+        system: 'You are FORGE. Generate weekly fitness reports. Return ONLY valid JSON.',
+        messages: [{
+          role: 'user',
+          content: `Weekly report for ${activeProfile.name}. Goal: ${activeProfile.goal}. Targets: ${targets.calories} kcal, ${targets.protein}g protein. Stats: ${workoutsCompleted}/7 workouts, avg ${avgCal} kcal, avg ${avgProtein}g protein. Return JSON: { "overallGrade":"B+","workoutGrade":"A","macroGrade":"B","summary":"2-3 sentences","recommendation":"one action" }`
+        }],
+        maxTokens: 300,
+      })
+      const parsed = parseJSON(text)
+      const report = { ...parsed, weekStr, stats: { workoutsCompleted, workoutRate, avgCal, avgProtein }, generatedAt: new Date().toISOString() }
+      saveWeeklyReport(activeProfile.id, weekStr, report)
+      setWeeklyReport(report)
+      setShowReport(true)
+    } catch { alert('Could not generate report. Try again.') }
+    finally { setGeneratingReport(false) }
+  }
 
   const dates = useMemo(() => {
     if (tab === 0) return last7Days()
@@ -201,8 +242,21 @@ export default function Progress() {
           <StatCard label="Avg Daily Cals" value={avgCal || '—'} sub={`target: ${targets.calories}`} />
           <StatCard label="Avg Protein" value={avgPro ? `${avgPro}g` : '—'} sub={`target: ${targets.protein}g`} />
           <StatCard label="Days Tracked" value={macroWithData.length} sub="with food logged" />
+          <StatCard label="Current Streak" value={`🔥 ${currentStreak}`} sub="days in a row" />
+          <StatCard label="Longest Streak" value={lStreak} sub="all time best" />
         </div>
+
+        {/* Weekly report button */}
+        <button onClick={weeklyReport ? () => setShowReport(true) : generateReport}
+          disabled={generatingReport}
+          className="w-full py-4 border border-accent/30 bg-accent/5 rounded-2xl font-black text-accent text-base active:scale-[0.98] disabled:opacity-50 transition-all">
+          {generatingReport ? 'Generating Report…' : weeklyReport ? '📊 View This Week\'s Report' : '📊 Generate Weekly Report'}
+        </button>
       </div>
+
+      {showReport && weeklyReport && (
+        <WeeklyReport report={weeklyReport} onClose={() => setShowReport(false)} />
+      )}
     </div>
   )
 }

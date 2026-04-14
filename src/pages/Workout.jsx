@@ -260,6 +260,86 @@ Keep the same JSON shape. Include research-backed notes explaining WHY each exer
   )
 }
 
+// ─── Injury Mode Modal ────────────────────────────────────────────────────────
+function InjuryModal({ profile, dayName, currentExercises, onSave, onClose }) {
+  const [description, setDescription] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const EXAMPLES = ['Sore shoulder','Lower back pain','Knee pain','Wrist injury','Ankle sprain']
+
+  async function rewrite() {
+    if (!description.trim() || loading) return
+    setLoading(true)
+    try {
+      const exerciseList = currentExercises.map(e => `${e.name} — ${e.sets}×${e.reps}`).join('\n')
+      const text = await callClaude({
+        system: 'You are a physical therapist and strength coach. Rewrite workouts to work around injuries safely. Return ONLY valid JSON.',
+        messages: [{
+          role: 'user',
+          content: `Athlete profile: Goal: ${profile.goal}, Fitness level: ${profile.fitnessLevel}, Has gym: ${profile.hasGym}
+
+Injury: "${description}"
+
+Current ${dayName} workout:
+${exerciseList}
+
+Rewrite this workout completely avoiding movements that stress the injured area. Include rehab-friendly alternatives.
+
+Return JSON array:
+[{ "name": "...", "sets": "3", "reps": "12", "rest": "60s", "notes": "Safe for ${description} because..." }]`
+        }],
+        maxTokens: 1200,
+      })
+      const updated = parseJSON(text)
+      onSave(updated, description)
+    } catch { alert('Could not rewrite workout. Try again.') }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm">
+      <div className="w-full max-w-lg bg-card rounded-t-3xl p-6 pb-10 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-white font-black text-lg">🩹 Injury Mode</p>
+            <p className="text-white/40 text-xs">FORGE will rewrite today's workout around your injury</p>
+          </div>
+          <button onClick={onClose} className="text-white/40 active:text-white">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-5 h-5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {EXAMPLES.map(e => (
+            <button key={e} onClick={() => setDescription(e)}
+              className={`px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${
+                description === e ? 'border-orange-400/60 bg-orange-400/10 text-orange-400' : 'border-border text-white/40'
+              }`}>{e}</button>
+          ))}
+        </div>
+        <textarea
+          className="w-full bg-[#1a1a1a] border border-border rounded-xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-orange-400/60 resize-none"
+          placeholder='Describe what hurts, e.g. "sharp pain in left shoulder when pressing overhead"'
+          rows={3}
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
+        <button onClick={rewrite} disabled={!description.trim() || loading}
+          className="w-full py-4 bg-orange-500 rounded-2xl font-black text-white text-base active:scale-[0.98] disabled:opacity-40 transition-all">
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="dot-1 inline-block w-2 h-2 rounded-full bg-white/60"/>
+              <span className="dot-2 inline-block w-2 h-2 rounded-full bg-white/60"/>
+              <span className="dot-3 inline-block w-2 h-2 rounded-full bg-white/60"/>
+            </span>
+          ) : 'Rewrite Workout Around Injury'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Rest Day Card ─────────────────────────────────────────────────────────────
 function RestDayCard() {
   return (
@@ -287,6 +367,7 @@ export default function Workout() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [showAddExercise, setShowAddExercise] = useState(false)
   const [showAIModify, setShowAIModify] = useState(false)
+  const [showInjury, setShowInjury] = useState(false)
   const [checkedExercises, setCheckedExercises] = useState({})
 
   const plan = activeProfile.workoutPlan
@@ -414,6 +495,20 @@ Rules:
     setCheckedExercises({})
   }
 
+  // ─── Apply injury-modified exercises ─────────────────────────────────────
+  function applyInjuryModification(newExercises, injuryNote) {
+    const current = plan?.[selectedDayName] || { focus: selectedDayName, exercises: [] }
+    const updatedPlan = {
+      ...plan,
+      [selectedDayName]: { ...current, exercises: newExercises, injuryNote },
+    }
+    const updated = { ...activeProfile, workoutPlan: updatedPlan }
+    saveProfile(updated)
+    refreshProfile()
+    setShowInjury(false)
+    setCheckedExercises({})
+  }
+
   const exercises = dayPlan?.exercises || []
   const completedCount = Object.values(checkedExercises).filter(Boolean).length
 
@@ -494,16 +589,19 @@ Rules:
                   {workoutLog?.completed ? ' · ✅ Done!' : ''}
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {/* AI Modify button */}
-                <button
-                  onClick={() => setShowAIModify(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-xl text-accent text-xs font-bold active:scale-95"
-                >
+                <button onClick={() => setShowAIModify(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-accent/10 border border-accent/30 rounded-xl text-accent text-xs font-bold active:scale-95">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
                     <path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 8v4l3 3"/><path d="M18 2v4h4"/>
                   </svg>
                   Modify
+                </button>
+                {/* Injury mode */}
+                <button onClick={() => setShowInjury(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-orange-500/10 border border-orange-500/30 rounded-xl text-orange-400 text-xs font-bold active:scale-95">
+                  🩹 Injured
                 </button>
               </div>
             </div>
@@ -580,6 +678,17 @@ Rules:
         <AddExerciseModal
           onSave={addExercise}
           onClose={() => setShowAddExercise(false)}
+        />
+      )}
+
+      {/* Injury Modal */}
+      {showInjury && (
+        <InjuryModal
+          profile={activeProfile}
+          dayName={selectedDayName}
+          currentExercises={exercises}
+          onSave={applyInjuryModification}
+          onClose={() => setShowInjury(false)}
         />
       )}
 
