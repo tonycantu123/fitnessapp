@@ -30,12 +30,13 @@ body {
 
 /* Scrollable page content (above bottom nav) */
 .page-scroll {
-  height: 100%;
+  /* Full viewport minus bottom nav (64px + home indicator) */
+  height: calc(100dvh - 64px - env(safe-area-inset-bottom, 16px));
+  /* Push content below Dynamic Island / notch */
+  padding-top: env(safe-area-inset-top, 0px);
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  /* Push content below Dynamic Island / notch */
-  padding-top: env(safe-area-inset-top, 0px);
 }
 
 /* Custom scrollbar hidden */
