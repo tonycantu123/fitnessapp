@@ -433,7 +433,7 @@ Rules:
       saveProfile(updated)
       refreshProfile()
     } catch (err) {
-      alert('Failed to generate plan. Try again.')
+      alert(`Failed to generate plan: ${err.message}`)
     } finally {
       setGenerating(false)
       setShowConfirm(false)

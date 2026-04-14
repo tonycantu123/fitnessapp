@@ -5,7 +5,7 @@ export async function callClaude({ system, messages, maxTokens = 1024 }) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: maxTokens,
       system,
       messages,
@@ -14,7 +14,8 @@ export async function callClaude({ system, messages, maxTokens = 1024 }) {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || 'Claude API error')
+    const msg = typeof err.error === 'string' ? err.error : JSON.stringify(err.error)
+    throw new Error(msg || 'Claude API error')
   }
 
   const data = await res.json()
